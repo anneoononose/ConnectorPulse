@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConnectorPulse — Enterprise Admin Health Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&family=Syne:wght@700;800&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #1a1d24;
+    --border: #222530;
+    --border-bright: #2e3342;
+    --text: #e8eaf0;
+    --text-muted: #6b7280;
+    --text-dim: #9ca3af;
+    --green: #00e5a0;
+    --green-dim: #00e5a015;
+    --green-glow: #00e5a030;
+    --yellow: #f59e0b;
+    --yellow-dim: #f59e0b15;
+    --red: #ef4444;
+    --red-dim: #ef444415;
+    --blue: #3b82f6;
+    --blue-dim: #3b82f615;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+    50% { opacity: 0.6; box-shadow: 0 0 16px var(--green); }
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+
+  .status-chip.healthy { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-glow); }
+  .status-chip.warning { background: var(--yellow-dim); color: var(--yellow); border: 1px solid #f59e0b30; }
+  .status-chip.critical { background: var(--red-dim); color: var(--red); border: 1px solid #ef444430; }
+  .status-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* LAYOUT */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .metric-value.green { color: var(--green); }
+  .metric-value.yellow { color: var(--yellow); }
+  .metric-value.red { color: var(--red); }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+
+  .connector-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .connector-item:hover { background: var(--surface); }
+  .connector-item.active { background: var(--surface2); border: 1px solid var(--border-bright); }
+
+  .connector-name {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .connector-status {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .connector-status.ok { background: var(--green); }
+  .connector-status.warn { background: var(--yellow); }
+  .connector-status.err { background: var(--red); }
+
+  /* MAIN */
+  .main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HERO HEALTH BAR */
+  .health-hero {
+    padding: 32px 36px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0d1117 0%, var(--bg) 100%);
+  }
+
+  .health-hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .health-score-block {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .health-score-number {
+    font-family: var(--display);
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--green);
+    text-shadow: 0 0 40px var(--green-glow);
+    letter-spacing: -3px;
+  }
+
+  .health-score-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .health-score-label strong {
+    display: block;
+    font-size: 16px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .health-bar-track {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .health-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green) 0%, #00c47a 100%);
+    border-radius: 2px;
+    width: 87%;
+    box-shadow: 0 0 12px var(--green);
+    transition: width 0.6s ease;
+  }
+
+  .health-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* CONTENT */
+  .content-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    flex: 1;
+  }
+
+  /* ANALYZER PANEL */
+  .analyzer-panel {
+    border-right: 1px solid var(--border);
+    padding: 28px 32px;
+  }
+
+  .panel-title {
+    font-family: var(--display);
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  .panel-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .scenario-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+
+  .scenario-btn:hover {
+    border-color: var(--border-bright);
+    background: var(--surface2);
+  }
+
+  .scenario-btn.active {
+    border-color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .scenario-icon { font-size: 16px; margin-bottom: 4px; }
+
+  .scenario-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .scenario-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.3;
+  }
+
+  .log-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 140px;
+    outline: none;
+    transition: border-color 0.15s;
+    margin-bottom: 12px;
+  }
+
+  .log-input:focus { border-color: var(--blue); }
+  .log-input::placeholder { color: var(--text-muted); }
+
+  .analyze-btn {
+    width: 100%;
+    background: var(--green);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .analyze-btn:hover { background: #00cc8f; box-shadow: 0 0 20px var(--green-glow); }
+  .analyze-btn:disabled { background: var(--surface2); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #00000040;
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* RESULTS PANEL */
+  .results-panel {
+    padding: 28px 32px;
+    overflow-y: auto;
+  }
+
+  .results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .results-empty-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  .results-empty-text {
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 240px;
+  }
+
+  /* AI RESULT CARD */
+  .result-card {
+    display: none;
+  }
+
+  .result-card.visible {
+    display: block;
+  }
+
+  .severity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+
+  .severity-badge.critical { background: var(--red-dim); color: var(--red); border: 1px solid #ef444430; }
+  .severity-badge.warning { background: var(--yellow-dim); color: var(--yellow); border: 1px solid #f59e0b30; }
+  .severity-badge.info { background: var(--blue-dim); color: var(--blue); border: 1px solid #3b82f630; }
+
+  .result-section {
+    margin-bottom: 18px;
+  }
+
+  .result-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .action-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .action-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+    background: var(--green-dim);
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .code-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+
+  .mttr-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .mttr-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .mttr-val {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+
+  .mttr-val.green { color: var(--green); }
+  .mttr-val.yellow { color: var(--yellow); }
+
+  .mttr-key {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* STREAMING */
+  .streaming-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 13px;
+    background: var(--green);
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* ERROR */
+  .error-msg {
+    background: var(--red-dim);
+    border: 1px solid #ef444430;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--red);
+    margin-top: 12px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    ConnectorPulse
+  </div>
+  <div class="header-meta">
+    <span id="clock" style="font-family: var(--mono); font-size: 11px; color: var(--text-muted);"></span>
+    <div class="status-chip healthy">
+      <div class="dot"></div>
+      <span id="overall-status">All Systems Nominal</span>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Deployment Health</div>
+      <div class="metric-card">
+        <div class="metric-value green" id="health-score">87</div>
+        <div class="metric-label">overall score / 100</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div class="metric-card">
+          <div class="metric-value green" style="font-size: 20px;">23</div>
+          <div class="metric-label">connectors active</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value yellow" style="font-size: 20px;">3</div>
+          <div class="metric-label">need attention</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Connectors</div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status ok"></div>
+          Google Drive
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">99.9%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status ok"></div>
+          Slack
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">99.7%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status ok"></div>
+          GitHub
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">98.2%</span>
+      </div>
+      <div class="connector-item active">
+        <div class="connector-name">
+          <div class="connector-status warn"></div>
+          Salesforce
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--yellow);">94.1%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status warn"></div>
+          ServiceNow
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--yellow);">91.3%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status err"></div>
+          Zendesk
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--red);">72.0%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status ok"></div>
+          Confluence
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">99.1%</span>
+      </div>
+      <div class="connector-item">
+        <div class="connector-name">
+          <div class="connector-status ok"></div>
+          Jira
+        </div>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">98.8%</span>
+      </div>
+    </div>
+
+    <div style="padding: 0 20px;">
+      <div class="sidebar-label">Self-Serve Rate</div>
+      <div style="font-family: var(--display); font-size: 36px; font-weight: 800; color: var(--text); margin-bottom: 4px;">68<span style="font-size: 20px; color: var(--text-muted);">%</span></div>
+      <div style="font-size: 11px; color: var(--text-muted);">issues resolved without support ticket</div>
+      <div class="health-bar-track" style="margin-top: 10px;">
+        <div class="health-bar-fill" style="width: 68%;"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- HEALTH HERO -->
+    <div class="health-hero">
+      <div class="health-hero-top">
+        <div class="health-score-block">
+          <div class="health-score-number">87</div>
+          <div class="health-score-label">
+            <strong>Deployment Health Score</strong>
+            Across 26 connectors · 1,240 active users
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">LAST SYNC</div>
+          <div style="font-family: var(--mono); font-size: 12px; color: var(--text-dim);" id="last-sync">2 min ago</div>
+        </div>
+      </div>
+      <div class="health-bar-track">
+        <div class="health-bar-fill"></div>
+      </div>
+      <div class="health-bar-labels">
+        <span>Critical (0)</span>
+        <span>Warning (3)</span>
+        <span>Healthy (23)</span>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- ANALYZER -->
+      <div class="analyzer-panel">
+        <div class="panel-title">AI Issue Analyzer</div>
+        <div class="panel-subtitle">Paste connector errors or system alerts. AI identifies root cause and surfaces self-serve resolution steps — no ticket required.</div>
+
+        <div class="scenario-grid">
+          <div class="scenario-btn" onclick="loadScenario('auth')" id="s-auth">
+            <div class="scenario-icon">🔐</div>
+            <div class="scenario-name">Auth Failure</div>
+            <div class="scenario-desc">OAuth token expiry, SSO mis-config</div>
+          </div>
+          <div class="scenario-btn" onclick="loadScenario('sync')" id="s-sync">
+            <div class="scenario-icon">🔄</div>
+            <div class="scenario-name">Sync Stalled</div>
+            <div class="scenario-desc">Indexing lag, rate limit hit</div>
+          </div>
+          <div class="scenario-btn" onclick="loadScenario('permission')" id="s-permission">
+            <div class="scenario-icon">🚫</div>
+            <div class="scenario-name">Permission Error</div>
+            <div class="scenario-desc">Scope mismatch, ACL propagation</div>
+          </div>
+          <div class="scenario-btn" onclick="loadScenario('webhook')" id="s-webhook">
+            <div class="scenario-icon">📡</div>
+            <div class="scenario-name">Webhook Timeout</div>
+            <div class="scenario-desc">Delivery failures, endpoint down</div>
+          </div>
+        </div>
+
+        <textarea class="log-input" id="log-input" placeholder="Paste error logs, system alerts, or connector status messages here...
+
+Example:
+[ERROR] Zendesk connector sync failed
+Status: 401 Unauthorized
+Message: OAuth token expired or revoked
+Connector ID: zdsk-prod-001
+Last successful sync: 2025-06-12 09:42 UTC"></textarea>
+
+        <div class="error-msg" id="error-msg"></div>
+
+        <button class="analyze-btn" id="analyze-btn" onclick="analyze()">
+          <div class="spinner" id="spinner"></div>
+          <span id="btn-text">⚡ Analyze & Get Resolution Steps</span>
+        </button>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="results-panel" id="results-panel">
+        <div class="results-empty" id="results-empty">
+          <div class="results-empty-icon">🔍</div>
+          <div class="results-empty-text">Paste a connector error or choose a scenario to get AI-powered root cause analysis and self-serve resolution steps.</div>
+        </div>
+
+        <div class="result-card" id="result-card">
+          <div class="panel-title" style="margin-bottom: 4px;">Diagnosis</div>
+          <div style="font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-bottom: 14px;" id="result-timestamp"></div>
+
+          <div id="severity-badge-container"></div>
+
+          <div class="result-section">
+            <div class="result-section-label">Root Cause</div>
+            <div class="result-text" id="result-root-cause"></div>
+          </div>
+
+          <div class="result-section">
+            <div class="result-section-label">Impact</div>
+            <div class="result-text" id="result-impact"></div>
+          </div>
+
+          <div class="result-section">
+            <div class="result-section-label">Self-Serve Resolution Steps</div>
+            <ul class="action-list" id="result-steps"></ul>
+          </div>
+
+          <div class="result-section" id="result-cmd-section" style="display:none;">
+            <div class="result-section-label">Diagnostic Commands</div>
+            <div class="code-block" id="result-cmd"></div>
+          </div>
+
+          <div class="result-section">
+            <div class="result-section-label">Estimated Resolution Time</div>
+            <div class="mttr-box">
+              <div class="mttr-item">
+                <div class="mttr-val green" id="mttr-self">—</div>
+                <div class="mttr-key">self-serve (this guide)</div>
+              </div>
+              <div class="mttr-item">
+                <div class="mttr-val yellow" id="mttr-ticket">—</div>
+                <div class="mttr-key">via support ticket</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const scenarios = {
+  auth: `[ERROR] Zendesk connector authentication failure
+Timestamp: 2025-06-14T08:23:11Z
+Connector: Zendesk Support (zdsk-prod-001)
+Status Code: 401 Unauthorized
+Message: OAuth 2.0 token expired or has been revoked
+Token issued: 2025-03-15T12:00:00Z
+Last successful sync: 2025-06-12 09:42 UTC
+Affected users: 847 (unable to search Zendesk tickets)
+Error frequency: 100% of sync attempts in last 4 hours`,
+
+  sync: `[WARN] Salesforce connector sync stalled
+Timestamp: 2025-06-14T07:55:00Z
+Connector: Salesforce CRM (sfdc-prod-002)
+Last successful index: 2025-06-13T22:10:00Z (9h 45min ago)
+Error: API rate limit exceeded (429 Too Many Requests)
+Rate limit: 15,000 requests/hour
+Current usage: 14,987 requests in last window
+Queue depth: 23,410 documents pending indexing
+Impacted: Sales team (312 users) cannot search recent opportunities`,
+
+  permission: `[ERROR] Google Drive permission propagation failure
+Timestamp: 2025-06-14T09:01:44Z
+Connector: Google Drive (gdrive-prod-003)
+Error: ACL sync mismatch detected
+Affected docs: 1,204 files returning incorrect access results
+Root event: Workspace domain migration completed 2025-06-13
+Service account: glean-connector@company.iam.gserviceaccount.com
+Missing scope: drive.readonly (was present pre-migration)
+Impact: 156 users seeing access denied on files they should be able to read`,
+
+  webhook: `[ERROR] ServiceNow webhook delivery failures
+Timestamp: 2025-06-14T08:40:22Z
+Connector: ServiceNow ITSM (snow-prod-004)  
+Webhook endpoint: https://ingest.glean.company.com/webhooks/snow
+HTTP status: 504 Gateway Timeout (connection refused after 30s)
+Failure rate: 94% of events in last 2 hours (847/901 failed)
+Queue backlog: 2,340 undelivered change events
+Last successful delivery: 2025-06-14T06:28:00Z
+Firewall rule last modified: 2025-06-14T06:15:00Z`
+};
+
+function loadScenario(key) {
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + key).classList.add('active');
+  document.getElementById('log-input').value = scenarios[key];
+  hideError();
+}
+
+function hideError() {
+  document.getElementById('error-msg').style.display = 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function setLoading(loading) {
+  const btn = document.getElementById('analyze-btn');
+  const spinner = document.getElementById('spinner');
+  const text = document.getElementById('btn-text');
+  btn.disabled = loading;
+  spinner.style.display = loading ? 'block' : 'none';
+  text.textContent = loading ? 'Analyzing...' : '⚡ Analyze & Get Resolution Steps';
+}
+
+async function analyze() {
+  const logs = document.getElementById('log-input').value.trim();
+  if (!logs) { showError('Paste an error log or choose a scenario above.'); return; }
+  hideError();
+  setLoading(true);
+
+  document.getElementById('results-empty').style.display = 'none';
+  document.getElementById('result-card').classList.remove('visible');
+
+  const prompt = `You are an expert enterprise SaaS admin console AI assistant. An IT admin has pasted the following connector error log. Analyze it and respond ONLY with a valid JSON object (no markdown, no extra text) with these exact fields:
+
+{
+  "severity": "critical" | "warning" | "info",
+  "severity_label": "short human label like CRITICAL — Auth Failure",
+  "root_cause": "2-3 sentence plain-English explanation of what went wrong and why",
+  "impact": "1-2 sentences on who is affected and what they cannot do",
+  "steps": ["step 1 text", "step 2 text", "step 3 text", "step 4 text"],
+  "diagnostic_commands": "optional CLI or API commands the admin can run to verify (or empty string)",
+  "mttr_self": "e.g. 5–10 min",
+  "mttr_ticket": "e.g. 2–4 hours"
+}
+
+Error log:
+${logs}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    const raw = data.content?.find(b => b.type === 'text')?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    renderResult(result);
+  } catch (e) {
+    showError('Analysis failed. Check your connection and try again.');
+    document.getElementById('results-empty').style.display = 'flex';
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResult(r) {
+  // severity badge
+  const badgeEl = document.getElementById('severity-badge-container');
+  const icons = { critical: '🔴', warning: '🟡', info: '🔵' };
+  badgeEl.innerHTML = `<div class="severity-badge ${r.severity}">${icons[r.severity] || '⚪'} ${r.severity_label}</div>`;
+
+  document.getElementById('result-timestamp').textContent = `Analyzed at ${new Date().toLocaleTimeString()} · Powered by Claude AI`;
+  document.getElementById('result-root-cause').textContent = r.root_cause;
+  document.getElementById('result-impact').textContent = r.impact;
+
+  const stepsList = document.getElementById('result-steps');
+  stepsList.innerHTML = '';
+  (r.steps || []).forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'action-item';
+    li.innerHTML = `<span class="action-num">${i + 1}</span><span>${s}</span>`;
+    stepsList.appendChild(li);
+  });
+
+  if (r.diagnostic_commands) {
+    document.getElementById('result-cmd-section').style.display = 'block';
+    document.getElementById('result-cmd').textContent = r.diagnostic_commands;
+  } else {
+    document.getElementById('result-cmd-section').style.display = 'none';
+  }
+
+  document.getElementById('mttr-self').textContent = r.mttr_self || '—';
+  document.getElementById('mttr-ticket').textContent = r.mttr_ticket || '—';
+
+  document.getElementById('result-card').classList.add('visible');
+}
+
+// Clock
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>
